@@ -32,7 +32,7 @@
 {%- endif -%}
 
 <section class="page-width section-{{ section.id }}-padding">
-  <div class="product product--{{ section.settings.media_size }} product--{{ section.settings.gallery_layout }} grid grid--1-col {% if product.media.size > 0 %}grid--2-col-tablet{% else %}product--no-media{% endif %}">
+  <div class="product product-single product--{{ section.settings.media_size }} product--{{ section.settings.gallery_layout }} grid grid--1-col {% if product.media.size > 0 %}grid--2-col-tablet{% else %}product--no-media{% endif %}">
     <div class="grid__item product__media-wrapper">
       <media-gallery id="MediaGallery-{{ section.id }}" role="region" {% if section.settings.enable_sticky_info %}class="product__media-gallery"{% endif %} aria-label="{{ 'products.product.media.gallery_viewer' | t }}" data-desktop-layout="{{ section.settings.gallery_layout }}">
         <div id="GalleryStatus-{{ section.id }}" class="visually-hidden" role="status"></div>
@@ -184,7 +184,7 @@
       </media-gallery>
     </div>
     <div class="product__info-wrapper grid__item{% if settings.page_width > 1400 and section.settings.media_size == "small" %} product__info-wrapper--extra-padding{% endif %}">
-      <div id="ProductInfo-{{ section.id }}" class="product__info-container{% if section.settings.enable_sticky_info %} product__info-container--sticky{% endif %}">
+      <div id="ProductInfo-{{ section.id }}" class="product_form product__info-container{% if section.settings.enable_sticky_info %} product__info-container--sticky{% endif %}" data-product="{{ product | json | escape }}"  data-product-id="{{ product.id }}>
         {%- assign product_form_id = 'product-form-' | append: section.id -%}
 
         {%- for block in section.blocks -%}
@@ -315,40 +315,144 @@
           {%- when 'variant_picker' -%}
             {%- unless product.has_only_default_variant -%}
               {%- if block.settings.picker_type == 'button' -%}
-                <variant-radios class="no-js-hidden" data-section="{{ section.id }}" data-url="{{ product.url }}" {{ block.shopify_attributes }}>
+                <variant-radios
+                  class="no-js-hidden swatch_options {{ block.settings.soldout_variant_style }}"
+                  data-section="{{ section.id }}"
+                  data-url="{{ product.url }}"
+                  {{ block.shopify_attributes }}>
                   {%- for option in product.options_with_values -%}
-                      <fieldset class="js product-form__input">
-                        <legend class="form__label">{{ option.name }}</legend>
-                        {%- for value in option.values -%}
-                          <input type="radio" id="{{ section.id }}-{{ option.position }}-{{ forloop.index0 }}"
-                                name="{{ option.name }}"
-                                value="{{ value | escape }}"
-                                form="{{ product_form_id }}"
-                                {% if option.selected_value == value %}checked{% endif %}
-                          >
-                          <label for="{{ section.id }}-{{ option.position }}-{{ forloop.index0 }}">
+            
+                    {% assign swatch = option.name %}
+                    {% assign found_option = false %}
+                    {% assign is_color = false %}
+                    {% assign show_size_chart = false %}
+                    {% assign option_index = 0 %}
+                    {% assign optionName = option.name | downcase %}
+                    {% for option in product.options %}
+                      {% if option == swatch %}
+                        {% assign found_option = true %}
+                        {% assign option_index = forloop.index0 %}
+                        {% assign downcased_option = swatch | downcase %}
+                        {% if downcased_option contains 'color' or downcased_option contains 'colour' %}
+                          {% assign is_color = true %}
+                        {% endif %}
+                        {% if downcased_option contains 'size' %}
+                          {% assign show_size_chart = true %}
+                       {% endif %}
+                      {% endif %}
+                    {% endfor %}
+                    <fieldset class="js product-form__input swatch  single-option-selector {{optionName}}" data-option-index="{{ option_index }}">
+                      <legend class="form__label">{{ option.name }}</legend>
+                      {% if show_size_chart %}
+                        {% if sitechartpagecontent != blank %}
+                        <div id="size_chart_img" style="display:none">
+                          {% if sitechartpagecontent != blank %}
+                            {{- sitechartpagecontent -}}
+                          {% endif %}
+                          {% comment %} 
+                          <img src="https://cdn.shopify.com/s/files/1/0022/6263/0500/t/2/assets/by-shani.jpg?5624">
+                          {% endcomment %}
+                      </div>
+                      <div class="size__chart product-form__item--size_chart text-right">
+                        <a href="#size_chart_img" data-fancybox="sizeguide">
+                          <svg fill="currentColor" stroke="currentColor" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><path d="M608 128H32c-17.67 0-32 14.33-32 32v192c0 17.67 14.33 32 32 32h576c17.67 0 32-14.33 32-32V160c0-17.67-14.33-32-32-32zm0 224H32V160h80v56c0 4.42 3.58 8 8 8h16c4.42 0 8-3.58 8-8v-56h64v56c0 4.42 3.58 8 8 8h16c4.42 0 8-3.58 8-8v-56h64v56c0 4.42 3.58 8 8 8h16c4.42 0 8-3.58 8-8v-56h64v56c0 4.42 3.58 8 8 8h16c4.42 0 8-3.58 8-8v-56h64v56c0 4.42 3.58 8 8 8h16c4.42 0 8-3.58 8-8v-56h80v192z"></path></svg>
+                          Size Guide
+                        </a>
+                      </div>
+                    {% endif %}
+                      {% endif %}
+                      {%- for value in option.values -%}
+                        <input
+                          type="radio"
+                          id="{{ section.id }}-{{ option.position }}-{{ forloop.index0 }}"
+                          name="{{ option.name }}"
+                          value="{{ value | escape }}"
+                          form="{{ product_form_id }}"
+                          data-value="{{ value | escape }}"
+                          class="swatch-element"
+                          {% if option.selected_value == value %}checked{% endif %}>
+                        {% assign proSku = product.selected_or_first_available_variant.sku | split: '-' | first %}
+                        {% for tag in product.tags %}
+                          {% if tag contains proSku %}
+                            {% if tag != '' %}
+                              {% assign tag = 1 %}
+                            {% else %}
+                              {% assign tag = 2 %}
+                            {% endif %}
+                          {% endif %}
+                        {% endfor %}
+                        {% if optionName == 'color' or optionName == 'colour' %}
+                          {% if tag == 1 %}
+                            <label class="opt-label opt-label-color">
+                              <img style="max-width:50px;" src="{{ product.featured_image | img_url: 'master' }}" />
+                              {% if product.available == false %}
+                                <img
+                                  class="color-crossed-out"
+                                  src="{{ 'soldout.png' | asset_url }}"
+                                  aria-label="sold out"
+                                  alt="sold out" />
+                              {% endif %}
+                            </label>
+                          {% else %}
+                            <label class="swatch-element-lab" for="{{ section.id }}-{{ option.position }}-{{ forloop.index0 }}">
+                              {{ value }}
+                              {% if is_color %}
+                                <div class="tooltip">{{ value }}</div>
+                              {% endif %}
+                              <img
+                                class="crossed-out"
+                                src="{{ 'soldout.png' | asset_url }}"
+                                aria-label="sold out"
+                                alt="sold out" />
+                            </label>
+                          {% endif %}
+                        {% else %}
+            
+                          <label class="swatch-element-lab" for="{{ section.id }}-{{ option.position }}-{{ forloop.index0 }}">
                             {{ value }}
+                            {% if is_color %}
+                              <div class="tooltip">{{ value }}</div>
+                            {% endif %}
+                            <img
+                              class="crossed-out"
+                              src="{{ 'soldout.png' | asset_url }}"
+                              aria-label="sold out"
+                              alt="sold out" />
                           </label>
-                        {%- endfor -%}
-                      </fieldset>
+            
+                        {% endif %}
+            
+            
+                      {%- endfor -%}
+                      {% if tag == 1 %}
+                        {% if optionName == 'color' or optionName == 'colour' or optionName == 'Color' or optionName == 'colour' %}
+                          {% render 'product-swatches', product: product %}
+                        {% endif %}
+                      {% endif %}
+            
+                    </fieldset>
                   {%- endfor -%}
                   <script type="application/json">
                     {{ product.variants | json }}
                   </script>
                 </variant-radios>
               {%- else -%}
-                <variant-selects class="no-js-hidden" data-section="{{ section.id }}" data-url="{{ product.url }}" {{ block.shopify_attributes }}>
+                <variant-selects
+                  class="no-js-hidden"
+                  data-section="{{ section.id }}"
+                  data-url="{{ product.url }}"
+                  {{ block.shopify_attributes }}>
                   {%- for option in product.options_with_values -%}
                     <div class="product-form__input product-form__input--dropdown">
                       <label class="form__label" for="Option-{{ section.id }}-{{ forloop.index0 }}">
                         {{ option.name }}
                       </label>
                       <div class="select">
-                        <select id="Option-{{ section.id }}-{{ forloop.index0 }}"
+                        <select
+                          id="Option-{{ section.id }}-{{ forloop.index0 }}"
                           class="select__select"
                           name="options[{{ option.name | escape }}]"
-                          form="{{ product_form_id }}"
-                        >
+                          form="{{ product_form_id }}">
                           {%- for value in option.values -%}
                             <option value="{{ value | escape }}" {% if option.selected_value == value %}selected="selected"{% endif %}>
                               {{ value }}
@@ -359,27 +463,30 @@
                       </div>
                     </div>
                   {%- endfor -%}
-
+            
                   <script type="application/json">
                     {{ product.variants | json }}
                   </script>
                 </variant-selects>
               {%- endif -%}
             {%- endunless -%}
-
+            
             <noscript class="product-form__noscript-wrapper-{{ section.id }}">
               <div class="product-form__input{% if product.has_only_default_variant %} hidden{% endif %}">
-                <label class="form__label" for="Variants-{{ section.id }}">{{ 'products.product.product_variants' | t }}</label>
+                <label class="form__label" for="Variants-{{ section.id }}">
+                  {{- 'products.product.product_variants' | t -}}
+                </label>
                 <div class="select">
-                  <select name="id" id="Variants-{{ section.id }}" class="select__select" form="{{ product_form_id }}">
+                  <select
+                    name="id"
+                    id="Variants-{{ section.id }}"
+                    class="select__select"
+                    form="{{ product_form_id }}">
                     {%- for variant in product.variants -%}
-                      <option
-                        {% if variant == product.selected_or_first_available_variant %}selected="selected"{% endif %}
-                        {% if variant.available == false %}disabled{% endif %}
-                        value="{{ variant.id }}"
-                      >
+                      <option {% if variant == product.selected_or_first_available_variant %}selected="selected"{% endif %}{% if variant.available == false %}disabled{% endif %}value="{{ variant.id }}">
                         {{ variant.title }}
-                        {%- if variant.available == false %} - {{ 'products.product.sold_out' | t }}{% endif %}
+                        {%- if variant.available == false %}
+                          - {{ 'products.product.sold_out' | t }}{% endif %}
                         - {{ variant.price | money | strip_html }}
                       </option>
                     {%- endfor -%}
@@ -641,6 +748,43 @@
   }
 </script>
 
+<style>
+  /* #Swatch Styles
+================================================== */
+.swatch-element.swatch--active { border-color: black; box-shadow: 0px 0px 0px 2px white; }
+.selector-wrapper label { margin-bottom: 0.5em; }
+.product_section .product_form { opacity: 0; transition: opacity 0.2s ease; }
+.product_section .product_form.is-visible { opacity: 1; }
+/*.select, .selector-wrapper { display: none; }*/
+.swatch_options { margin-bottom: 1em; }
+.swatch .option_title { width: 100%; margin: 0.5em 0; }
+/* Hide radio buttons */
+.swatch input { display: none; }
+.swatch label { margin: 0; cursor: pointer; padding: 10px; font-size: 13px; text-transform: uppercase; }
+.swatch .color label { background-size: cover; background-position: center; height: 34px; min-width: 34px; line-height: 34px; }
+.swatch-element { border: #e2e2e2 1px solid; }
+.swatch-element.color { padding: 3px; }
+.swatch-element.color, .swatch-element.color label { border: #e2e2e2 1px solid; }
+.swatch-element.color.swatch-element label { padding: 0; margin: 0; width: 34px; height: 34px; }
+.swatch_options input:checked + .swatch-element { border-color: black; box-shadow: 0px 0px 0px 2px white; }
+.swatch .swatch-element {display: inline-block; position: relative; margin: 0px 8px 8px 0; transform: translateZ(0); }
+.swatch .swatch-element +.swatch-element-lab .crossed-out { display: none; }
+.swatch .swatch-element.soldout +.swatch-element-lab .crossed-out{ display: block; height: 100%; width: 100%; pointer-events: none; object-fit: fill; }
+.swatch .swatch-element.soldout label { opacity: 0.6; }
+.crossed-out { background-image: linear-gradient(to bottom left, transparent 50%, #999 50%, #999 calc(50% + 1px), transparent 50%), linear-gradient(to bottom right, transparent 50%, #999 50%, #999 calc(50% + 1px), transparent 50%); position: absolute; left: 0; right: 0; top: 0; bottom: 0; margin: auto; }
+.crossout_variants .swatch .swatch-element.soldout + .swatch-element-lab .crossed-out{ display:block }
+.hide_variants .swatch .swatch-element.soldout + .swatch-element-lab{ display:none }
+
+/* Tooltips */
+.swatch .tooltip { text-align: center; background: #333; background: rgba(51, 51, 51, 0.9); color: #fff; bottom: 100%; padding: 5px 10px; display: block; position: absolute; width: 120px; font-size: 13px; left: -35px; margin-bottom: 15px; opacity: 0; visibility: hidden; transform: translateY(10px); transition: all 0.25s ease-out; box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.28); z-index: 10000; }
+.swatch .tooltip:before { content: ""; bottom: -20px; display: block; height: 20px; left: 0; position: absolute; width: 100%; }
+/* CSS triangle */
+.swatch .tooltip:after { content: ""; border-left: solid transparent 10px; border-right: solid transparent 10px; border-top: solid rgba(51, 51, 51, 0.9) 10px; bottom: -10px; height: 0; left: 50%; margin-left: -13px; position: absolute; width: 0; }
+.swatch .swatch-element-lab:hover .tooltip { opacity: 1; visibility: visible; transform: translateY(0px); }
+/* #Sidebar */
+</style>
+<script src="{{ 'product-crossout.js' | asset_url }}" defer="defer"></script>
+
 {% schema %}
 {
   "name": "t:sections.main-product.name",
@@ -717,6 +861,22 @@
           ],
           "default": "button",
           "label": "t:sections.main-product.blocks.variant_picker.settings.picker_type.label"
+        },
+        {
+          "type": "select",
+          "id": "soldout_variant_style",
+          "options": [
+            {
+              "value": "hide_variants",
+              "label": "Hide variants"
+            },
+            {
+              "value": "crossout_variants",
+              "label": "Cross out variants"
+            }
+          ],
+          "default": "crossout_variants",
+          "label": "Cross out variants"
         }
       ]
     },
